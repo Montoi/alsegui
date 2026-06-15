@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Inquilino } from '../types'
-import { getInitials, getAvatarColor, formatMonto } from '../utils/format'
+import { getInitials, getAvatarColor, formatMonto, formatFecha } from '../utils/format'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -273,7 +273,6 @@ export default function Administracion({
   const cantidadDueños = new Set(
     inquilinos.map(i => i.nombreDueño ?? i.propiedadAsignada)
   ).size
-
   return (
     <div className="page-admin">
       {/* ── Page Header ── */}
@@ -282,13 +281,18 @@ export default function Administracion({
           <p className="page-super">Gestión de Contratos</p>
           <h1 className="page-title">Administración</h1>
         </div>
-        <button id="btn-agregar-inquilino" className="btn-export" onClick={abrirAgregar}>
-          + Agregar Inquilino
-        </button>
+        <div className="page-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div className="dash-date-tag" style={{ margin: 0 }}>
+            📅 {formatFecha(new Date())}
+          </div>
+          <button id="btn-agregar-inquilino" className="btn-export" onClick={abrirAgregar}>
+            + Agregar Inquilino
+          </button>
+        </div>
       </div>
 
       {/* ── Stats bar ── */}
-      <div className="admin-stats-bar">
+      <div className="admin-stats-bar" style={{ marginTop: '0.5rem' }}>
         <div className="admin-stat">
           <span className="admin-stat-num">{inquilinos.length}</span>
           <span className="admin-stat-label">Inquilinos</span>
@@ -298,8 +302,10 @@ export default function Administracion({
           <span className="admin-stat-label">Dueños</span>
         </div>
         <div className="admin-stat">
-          <span className="admin-stat-num">{formatMonto(potencialBruto)}</span>
-          <span className="admin-stat-label">Potencial de Ingresos</span>
+          <span className="admin-stat-num" style={{ fontSize: '1.25rem' }}>
+            {formatMonto(potencialBruto - potencialComision)} / <span style={{fontSize: '0.75em', color: 'var(--text-light)'}}>{formatMonto(potencialBruto)}</span>
+          </span>
+          <span className="admin-stat-label">Potencial Neto / Bruto</span>
         </div>
         <div className="admin-stat">
           <span className="admin-stat-num">{formatMonto(potencialComision)}</span>

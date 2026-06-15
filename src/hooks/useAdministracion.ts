@@ -45,9 +45,20 @@ export function useAdministracion() {
     const init = async () => {
       setLoading(true)
       await fetchInquilinos()
-      // Por defecto cargamos los pagos del mes actual para que el Dashboard funcione
-      const mesActual = getMesKey(new Date())
-      await fetchPagosMes(mesActual)
+      // Cargamos pagos del mes actual y del mes anterior para evaluar deudas
+      const today = new Date()
+      const mesActual = getMesKey(today)
+      
+      let prevMes = today.getMonth() - 1
+      let prevAno = today.getFullYear()
+      if (prevMes < 0) { prevMes = 11; prevAno -= 1 }
+      const mesAnterior = `${prevAno}-${String(prevMes + 1).padStart(2, '0')}`
+      
+      await Promise.all([
+        fetchPagosMes(mesActual),
+        fetchPagosMes(mesAnterior)
+      ])
+      
       setLoading(false)
     }
     init()
