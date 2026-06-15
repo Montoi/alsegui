@@ -2,8 +2,6 @@ import { useMemo } from 'react'
 import type { Inquilino, Pagos } from '../types'
 import { getMesKey } from '../hooks/useDashboard'
 import { formatMonto, formatMes, formatFecha } from '../utils/format'
-import { IconChart } from '../icons/Icons'
-
 interface FinanzasProps {
   inquilinos: Inquilino[]
   pagos: Pagos
