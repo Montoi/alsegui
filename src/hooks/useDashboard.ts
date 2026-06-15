@@ -103,10 +103,11 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos) {
 
   const inquilinosConEstado = useMemo<InquilinoConEstado[]>(
     () =>
-      inquilinos.map(inq =>
-        calcularEstado(inq, pagosMes[inq.id] ?? false, new Date())
-      ),
-    [inquilinos, pagosMes]
+      inquilinos.map(inq => {
+        const fechaLimite = new Date(today.getFullYear(), today.getMonth(), inq.diaPagoMes)
+        return calcularEstado(inq, pagosMes[inq.id] ?? false, fechaLimite, today)
+      }),
+    [inquilinos, pagosMes, today]
   )
 
   // ── 2. Ordenamiento por prioridad de cobranza ───────────────────────────
