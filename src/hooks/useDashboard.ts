@@ -93,38 +93,21 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos) {
 
   // ── 1. Estado individual de cada inquilino ───────────────────────────────
 
-  const inquilinosConEstado = useMemo<InquilinoConEstado[]>(() => {
-    const todayNorm = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-    
-    return inquilinos.map(inq => {
-      let mes = todayNorm.getMonth()
-      let ano = todayNorm.getFullYear()
-      
-      let evalMesKey = `${ano}-${String(mes + 1).padStart(2, '0')}`
-      let haPagado = pagos[evalMesKey]?.[inq.id] ?? false
-      
-      if (todayNorm.getDate() < inq.diaPagoMes) {
-        let prevMes = mes - 1
-        let prevAno = ano
-        if (prevMes < 0) {
-          prevMes = 11
-          prevAno -= 1
-        }
-        const prevMesKey = `${prevAno}-${String(prevMes + 1).padStart(2, '0')}`
-        const pagoPrevio = pagos[prevMesKey]?.[inq.id] ?? false
-        
-        if (!pagoPrevio) {
-          mes = prevMes
-          ano = prevAno
-          evalMesKey = prevMesKey
-          haPagado = false
-        }
-      }
-      
-      const fechaLimite = new Date(ano, mes, inq.diaPagoMes)
-      return calcularEstado(inq, haPagado, fechaLimite, todayNorm)
-    })
-  }, [inquilinos, pagos])
+  // Pagos del mes actual — memoizado para estabilidad de referencia
+  const pagosMes = useMemo<Record<string, boolean>>(
+    () => pagos[mesKey] ?? {},
+    [pagos, mesKey]
+  )
+
+  // ── 1. Estado individual de cada inquilino ───────────────────────────────
+
+  const inquilinosConEstado = useMemo<InquilinoConEstado[]>(
+    () =>
+      inquilinos.map(inq =>
+        calcularEstado(inq, pagosMes[inq.id] ?? false, new Date())
+      ),
+    [inquilinos, pagosMes]
+  )
 
   // ── 2. Ordenamiento por prioridad de cobranza ───────────────────────────
   //   1° Atrasados (más días vencidos primero)
