@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+
+  # ── Frontend (React + nginx) ──────────────────────────────────
+  rental-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rental_frontend
+    restart: always
+    ports:
+      - '80:80'       # Acceso público: http://TU_IP
+    depends_on:
+      rental-api:
+        condition: service_started
+
+  # ── Backend API (Node.js + Express) ──────────────────────────
+  rental-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: rental_api
+    restart: always
+    environment:
+      DATABASE_URL: postgres://${PG_USER:-alsegui_user}:${PG_PASSWORD:-alsegui_pass}@postgres-db:5432/${PG_DB:-alquileres_db}
+      PORT: 3001
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    # Puerto 3001 NO expuesto al exterior — solo accesible dentro de la red Docker
+
+  # ── Base de Datos (PostgreSQL 16) ─────────────────────────────
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: rental_postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER:     ${PG_USER:-alsegui_user}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-alsegui_pass}
+      POSTGRES_DB:       ${PG_DB:-alquileres_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data          # Datos persistentes
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql  # Schema + seed (solo primer arranque)
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U ${PG_USER:-alsegui_user} -d ${PG_DB:-alquileres_db}"]
+      interval: 5s
+      timeout:  3s
+      retries:  5
+    # Puerto 5432 NO expuesto al exterior — solo accesible dentro de la red Docker
+
+volumes:
+  postgres_data:
+    driver: local

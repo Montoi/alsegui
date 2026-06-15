@@ -1,4 +1,3 @@
-import type { Inquilino, Pagos } from '../types'
 import type { ReactNode } from 'react'
 
 // ─── ReportType ───────────────────────────────────────────────────────────────
@@ -119,82 +118,4 @@ export const REPORTS: Report[] = [
   { id: 'r6', name: 'Monthly Active Users',      type: 'Users',      date: 'Jun 1, 2024',  size: '0.9 MB', status: 'Ready'      },
 ]
 
-// ─── Inquilinos de muestra ───────────────────────────────────────────────────
-// Fechas de pago elegidas para ilustrar los 4 estados basados en Junio 2026.
 
-export const MOCK_INQUILINOS: Inquilino[] = [
-  {
-    id: 'inq-1',
-    nombre: 'María González',
-    propiedadAsignada: 'Edificio Las Palmas / Apto 2A',
-    nombreDueño: 'Carlos Pérez',
-    montoAlquiler: 15_000,
-    comisionPorcentaje: 10,
-    diaPagoMes: 1,      // ya pasó el 1 → Atrasado (pre-seeded como Pagado)
-    diaEntregaDueño: 10,
-  },
-  {
-    id: 'inq-2',
-    nombre: 'Juan Rodríguez',
-    propiedadAsignada: 'Edificio Las Palmas / Apto 3B',
-    nombreDueño: 'Carlos Pérez',
-    montoAlquiler: 18_000,
-    comisionPorcentaje: 10,
-    diaPagoMes: 5,      // 8 días de atraso → Atrasado por 3 días
-    diaEntregaDueño: 10,
-  },
-  {
-    id: 'inq-3',
-    nombre: 'Ana Martínez',
-    propiedadAsignada: 'Casa Villa Rosa / Hab 1',
-    nombreDueño: 'Laura Díaz',
-    montoAlquiler: 8_000,
-    comisionPorcentaje: 12,
-    diaPagoMes: 10,     // 3 días de atraso → Período de Gracia
-    diaEntregaDueño: 20,
-  },
-  {
-    id: 'inq-4',
-    nombre: 'Pedro López',
-    propiedadAsignada: 'Torre Norte / Apto 4C',
-    nombreDueño: 'Roberto Méndez',
-    montoAlquiler: 22_000,
-    comisionPorcentaje: 8,
-    diaPagoMes: 15,     // faltan 2 días → Pendiente
-    diaEntregaDueño: 25,
-  },
-  {
-    id: 'inq-5',
-    nombre: 'Sofía Castro',
-    propiedadAsignada: 'Casa Villa Rosa / Hab 2',
-    nombreDueño: 'Laura Díaz',
-    montoAlquiler: 9_000,
-    comisionPorcentaje: 12,
-    diaPagoMes: 20,     // faltan 7 días → Pendiente
-    diaEntregaDueño: 20,
-  },
-  {
-    id: 'inq-6',
-    nombre: 'Roberto Salas',
-    propiedadAsignada: 'Residencial Sur / Apto 1B',
-    nombreDueño: 'Ana Torres',
-    montoAlquiler: 12_000,
-    comisionPorcentaje: 10,
-    diaPagoMes: 25,     // faltan 12 días → Pendiente
-    diaEntregaDueño: 5,
-  },
-]
-
-// ─── Pagos iniciales del mes actual ──────────────────────────────────────────
-// inq-1 (María González) ya pagó este mes.
-
-function getMesKeyNow(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-export const INITIAL_PAGOS: Pagos = {
-  [getMesKeyNow()]: {
-    'inq-1': true,
-  },
-}
