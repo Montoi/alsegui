@@ -1794,7 +1794,12 @@
     gap: var(--sm);
   }
 
-  .page-actions, .dash-date-tag {
+  .page-actions {
+    align-self: flex-start;
+    flex-direction: column;
+  }
+  
+  .dash-date-tag {
     align-self: flex-start;
   }
 

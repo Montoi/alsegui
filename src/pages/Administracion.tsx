@@ -281,7 +281,7 @@ export default function Administracion({
           <p className="page-super">Gestión de Contratos</p>
           <h1 className="page-title">Administración</h1>
         </div>
-        <div className="page-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="page-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-start' }}>
           <div className="dash-date-tag" style={{ margin: 0 }}>
             📅 {formatFecha(new Date())}
           </div>
