@@ -70,7 +70,7 @@ export default function Finanzas({ inquilinos, pagos }: FinanzasProps) {
   }, [inquilinos, pagos, mesKey])
 
   return (
-    <div className="page-finanzas">
+    <>
       {/* ── Page Header ── */}
       <div className="page-header">
         <div>
@@ -165,6 +165,6 @@ export default function Finanzas({ inquilinos, pagos }: FinanzasProps) {
           </tbody>
         </table>
       </div>
-    </div>
+    </>
   )
 }
