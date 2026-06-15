@@ -36,9 +36,16 @@ async function start() {
   // Verificar conexión a la base de datos antes de aceptar tráfico
   try {
     await pool.query('SELECT 1')
-    console.log('✅ Conexión a PostgreSQL establecida')
+    
+    // Migración automática: agregar ultimo_mes_pagado si no existe
+    await pool.query(`
+      ALTER TABLE inquilinos 
+      ADD COLUMN IF NOT EXISTS ultimo_mes_pagado TEXT;
+    `)
+    
+    console.log('✅ Conexión a PostgreSQL establecida y BD migrada')
   } catch (err) {
-    console.error('❌ No se pudo conectar a PostgreSQL:', err)
+    console.error('❌ No se pudo conectar a PostgreSQL o falló migración:', err)
     process.exit(1)
   }
 

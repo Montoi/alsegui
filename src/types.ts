@@ -18,6 +18,8 @@ export interface Inquilino {
   diaPagoMes: number
   /** Día del mes en que debes transferirle al dueño. Ej: 10 */
   diaEntregaDueño: number
+  /** Último mes pagado en formato YYYY-MM */
+  ultimoMesPagado?: string
 }
 
 // ─── Estados de Pago ──────────────────────────────────────────────────────────

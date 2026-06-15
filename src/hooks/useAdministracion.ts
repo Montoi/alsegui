@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Inquilino, Pagos } from '../types'
-import { getMesKey } from './useDashboard'
 
 /**
  * Hook de Administración.
@@ -26,43 +25,29 @@ export function useAdministracion() {
     }
   }, [])
 
-  const fetchPagosMes = useCallback(async (mes: string) => {
+  const fetchTodosPagos = useCallback(async () => {
     try {
-      const res = await fetch(`/api/pagos?mes=${mes}`)
+      const res = await fetch('/api/pagos')
       if (res.ok) {
         const data = await res.json()
-        setPagos(prev => ({
-          ...prev,
-          [mes]: data
-        }))
+        setPagos(data)
       }
     } catch (err) {
-      console.error(`Error fetching pagos for ${mes}:`, err)
+      console.error('Error fetching all pagos:', err)
     }
   }, [])
 
   useEffect(() => {
     const init = async () => {
       setLoading(true)
-      await fetchInquilinos()
-      // Cargamos pagos del mes actual y del mes anterior para evaluar deudas
-      const today = new Date()
-      const mesActual = getMesKey(today)
-      
-      let prevMes = today.getMonth() - 1
-      let prevAno = today.getFullYear()
-      if (prevMes < 0) { prevMes = 11; prevAno -= 1 }
-      const mesAnterior = `${prevAno}-${String(prevMes + 1).padStart(2, '0')}`
-      
       await Promise.all([
-        fetchPagosMes(mesActual),
-        fetchPagosMes(mesAnterior)
+        fetchInquilinos(),
+        fetchTodosPagos()
       ])
-      
       setLoading(false)
     }
     init()
-  }, [fetchInquilinos, fetchPagosMes])
+  }, [fetchInquilinos, fetchTodosPagos])
 
   // ─── CRUD de Inquilinos ─────────────────────────────────────────────────────
 
@@ -139,11 +124,11 @@ export function useAdministracion() {
       
       if (!res.ok) {
         // Revertir en caso de error
-        await fetchPagosMes(yearMonth)
+        await fetchTodosPagos()
       }
     } catch (err) {
       console.error('Error registering pago:', err)
-      await fetchPagosMes(yearMonth)
+      await fetchTodosPagos()
     }
   }
 
@@ -155,6 +140,6 @@ export function useAdministracion() {
     editarInquilino,
     eliminarInquilino,
     registrarPago,
-    fetchPagosMes, // Exportado por si otras vistas necesitan cargar historial
+    fetchTodosPagos, // Exportado por si otras vistas necesitan cargar historial
   }
 }

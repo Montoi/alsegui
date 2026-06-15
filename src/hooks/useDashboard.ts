@@ -93,21 +93,63 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos) {
 
   // ── 1. Estado individual de cada inquilino ───────────────────────────────
 
-  // Pagos del mes actual — memoizado para estabilidad de referencia
-  const pagosMes = useMemo<Record<string, boolean>>(
-    () => pagos[mesKey] ?? {},
-    [pagos, mesKey]
-  )
-
   // ── 1. Estado individual de cada inquilino ───────────────────────────────
 
   const inquilinosConEstado = useMemo<InquilinoConEstado[]>(
     () =>
       inquilinos.map(inq => {
-        const fechaLimite = new Date(today.getFullYear(), today.getMonth(), inq.diaPagoMes)
-        return calcularEstado(inq, pagosMes[inq.id] ?? false, fechaLimite, today)
+        let year = today.getFullYear()
+        let month = today.getMonth()
+        let haPagado = false
+
+        if (inq.ultimoMesPagado) {
+          const [uYearStr, uMonthStr] = inq.ultimoMesPagado.split('-')
+          let checkYear = parseInt(uYearStr, 10)
+          let checkMonth = parseInt(uMonthStr, 10) // 1-indexed, so it perfectly represents the *next* 0-indexed month
+
+          if (checkMonth > 11) {
+            checkMonth = 0
+            checkYear++
+          }
+
+          // Avanzar mes por mes hasta encontrar uno no pagado o superar el mes actual
+          while (
+            checkYear < today.getFullYear() ||
+            (checkYear === today.getFullYear() && checkMonth <= today.getMonth())
+          ) {
+            const mKey = `${checkYear}-${String(checkMonth + 1).padStart(2, '0')}`
+            if (!pagos[mKey]?.[inq.id]) {
+              // Encontramos el primer mes no pagado
+              year = checkYear
+              month = checkMonth
+              break
+            }
+            checkMonth++
+            if (checkMonth > 11) {
+              checkMonth = 0
+              checkYear++
+            }
+          }
+
+          // Si el loop terminó y llegamos a un mes futuro, significa que ya pagó el mes actual (o más)
+          if (
+            checkYear > today.getFullYear() ||
+            (checkYear === today.getFullYear() && checkMonth > today.getMonth())
+          ) {
+            haPagado = true
+            year = today.getFullYear()
+            month = today.getMonth()
+          }
+        } else {
+          // Sin ultimoMesPagado, evaluamos el mes actual
+          const mKeyActual = `${year}-${String(month + 1).padStart(2, '0')}`
+          haPagado = pagos[mKeyActual]?.[inq.id] ?? false
+        }
+
+        const fechaLimite = new Date(year, month, inq.diaPagoMes)
+        return calcularEstado(inq, haPagado, fechaLimite, today)
       }),
-    [inquilinos, pagosMes, today]
+    [inquilinos, pagos, today]
   )
 
   // ── 2. Ordenamiento por prioridad de cobranza ───────────────────────────

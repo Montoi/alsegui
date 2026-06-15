@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { Inquilino } from '../types'
 import { getInitials, getAvatarColor, formatMonto, formatFecha } from '../utils/format'
 
@@ -182,6 +182,20 @@ function FormularioInquilino({ inicial, modo, onSubmit, onCancelar }: Formulario
               )}
             </div>
 
+            {/* Último mes pagado */}
+            <div className="settings-field">
+              <label htmlFor="f-ultimo-pago">Último Mes Pagado (Opcional)</label>
+              <input
+                id="f-ultimo-pago"
+                type="month"
+                value={form.ultimoMesPagado ?? ''}
+                onChange={e => set('ultimoMesPagado', e.target.value)}
+              />
+              <span className="field-hint" style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginTop: '4px', display: 'block' }}>
+                Si se deja en blanco, el sistema asume que entra en vigencia en el mes actual.
+              </span>
+            </div>
+
           </div>
 
           {/* Preview comisión */}
@@ -264,15 +278,29 @@ export default function Administracion({
       }
     : FORM_VACIO
 
-  // ── Estadísticas rápidas ─────────────────────────────────────────────────
-  const potencialBruto = inquilinos.reduce((s, i) => s + i.montoAlquiler, 0)
-  const potencialComision = inquilinos.reduce(
-    (s, i) => s + i.montoAlquiler * (i.comisionPorcentaje / 100),
-    0
-  )
-  const cantidadDueños = new Set(
-    inquilinos.map(i => i.nombreDueño ?? i.propiedadAsignada)
-  ).size
+  // ── Estadísticas por Dueño ───────────────────────────────────────────────
+  const statsPorDueño = useMemo(() => {
+    const grupos: Record<string, {
+      cantidad: number,
+      potencialBruto: number,
+      potencialComision: number
+    }> = {}
+
+    inquilinos.forEach(inq => {
+      const dueno = inq.nombreDueño?.trim() || 'Sin especificar'
+      if (!grupos[dueno]) {
+        grupos[dueno] = { cantidad: 0, potencialBruto: 0, potencialComision: 0 }
+      }
+      grupos[dueno].cantidad++
+      grupos[dueno].potencialBruto += inq.montoAlquiler
+      grupos[dueno].potencialComision += inq.montoAlquiler * (inq.comisionPorcentaje / 100)
+    })
+
+    return Object.entries(grupos)
+      .map(([dueno, stats]) => ({ dueno, ...stats }))
+      .sort((a, b) => b.potencialBruto - a.potencialBruto) // Ordenar por mayor volumen
+  }, [inquilinos])
+
   return (
     <div className="page-admin">
       {/* ── Page Header ── */}
@@ -291,26 +319,32 @@ export default function Administracion({
         </div>
       </div>
 
-      {/* ── Stats bar ── */}
-      <div className="admin-stats-bar" style={{ marginTop: '0.5rem' }}>
-        <div className="admin-stat">
-          <span className="admin-stat-num">{inquilinos.length}</span>
-          <span className="admin-stat-label">Inquilinos</span>
-        </div>
-        <div className="admin-stat">
-          <span className="admin-stat-num">{cantidadDueños}</span>
-          <span className="admin-stat-label">Dueños</span>
-        </div>
-        <div className="admin-stat">
-          <span className="admin-stat-num" style={{ fontSize: '1.25rem' }}>
-            {formatMonto(potencialBruto - potencialComision)} / <span style={{fontSize: '0.75em', color: 'var(--text-light)'}}>{formatMonto(potencialBruto)}</span>
-          </span>
-          <span className="admin-stat-label">Potencial Neto / Bruto</span>
-        </div>
-        <div className="admin-stat">
-          <span className="admin-stat-num">{formatMonto(potencialComision)}</span>
-          <span className="admin-stat-label">Potencial de Comisión</span>
-        </div>
+      {/* ── Stats bar por Dueño ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+        {statsPorDueño.map(stat => (
+          <div key={stat.dueno} className="admin-stats-bar">
+            <div className="admin-stat">
+              <span className="admin-stat-num" style={{ fontSize: '1.25rem', color: 'var(--primary)' }}>
+                {stat.dueno}
+              </span>
+              <span className="admin-stat-label">Propietario</span>
+            </div>
+            <div className="admin-stat">
+              <span className="admin-stat-num">{stat.cantidad}</span>
+              <span className="admin-stat-label">Inquilinos</span>
+            </div>
+            <div className="admin-stat">
+              <span className="admin-stat-num" style={{ fontSize: '1.25rem' }}>
+                {formatMonto(stat.potencialBruto - stat.potencialComision)} / <span style={{fontSize: '0.75em', color: 'var(--text-light)'}}>{formatMonto(stat.potencialBruto)}</span>
+              </span>
+              <span className="admin-stat-label">Potencial Neto / Bruto</span>
+            </div>
+            <div className="admin-stat">
+              <span className="admin-stat-num">{formatMonto(stat.potencialComision)}</span>
+              <span className="admin-stat-label">Potencial de Comisión</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ── Lista de Inquilinos ── */}
