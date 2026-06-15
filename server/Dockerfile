@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Instalar dependencias (incluyendo devDeps para compilar TS)
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # Compilar TypeScript → JavaScript
 COPY tsconfig.json ./
@@ -19,7 +19,7 @@ WORKDIR /app
 
 # Solo dependencias de producción
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 # Copiar el JavaScript compilado
 COPY --from=builder /app/dist ./dist
