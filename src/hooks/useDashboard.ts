@@ -229,6 +229,14 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
     const inqMap = Object.fromEntries(inquilinos.map(i => [i.id, i]))
     const hoy = new Date()
 
+    // Monto mensual esperado por dueño: suma neta si TODOS sus inquilinos pagaran
+    const esperadoPorDueño: Record<string, number> = {}
+    for (const inq of inquilinos) {
+      const keyDueño = inq.nombreDueño ?? inq.propiedadAsignada
+      const neto = inq.montoAlquiler * (1 - inq.comisionPorcentaje / 100)
+      esperadoPorDueño[keyDueño] = (esperadoPorDueño[keyDueño] ?? 0) + neto
+    }
+
     // grupos[dueño][yearMonth] = PagoPorMes
     const grupos: Record<string, {
       diaEntregaDueño: number
@@ -307,6 +315,7 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
           totalListo,
           totalPendiente,
           totalNeto: totalListo + totalPendiente,
+          montoMensualEsperado: esperadoPorDueño[dueño] ?? 0,
         } satisfies LiquidacionDueño
       })
       .filter((x): x is LiquidacionDueño => x !== null)

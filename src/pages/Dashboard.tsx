@@ -256,8 +256,8 @@ export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, 
                         <span className="liq-total-label">✅ Pagar ahora al dueño</span>
                         <span className="liq-total-monto">
                           {formatMonto(liq.totalListo)}
-                          {liq.totalNeto > liq.totalListo && (
-                            <span className="liq-total-de-total"> / {formatMonto(liq.totalNeto)}</span>
+                          {liq.montoMensualEsperado > liq.totalListo && (
+                            <span className="liq-total-de-total"> / {formatMonto(liq.montoMensualEsperado)} del mes</span>
                           )}
                         </span>
                       </div>
@@ -265,7 +265,12 @@ export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, 
                     {liq.totalPendiente > 0 && (
                       <div className="liq-total-pendiente">
                         <span className="liq-total-label">📅 Pagar al dueño el día {liq.diaEntregaDueño}</span>
-                        <span className="liq-total-monto">{formatMonto(liq.totalPendiente)}</span>
+                        <span className="liq-total-monto">
+                          {formatMonto(liq.totalPendiente)}
+                          {liq.montoMensualEsperado > liq.totalPendiente && (
+                            <span className="liq-total-de-total"> / {formatMonto(liq.montoMensualEsperado)} del mes</span>
+                          )}
+                        </span>
                       </div>
                     )}
                   </div>

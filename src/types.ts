@@ -78,6 +78,8 @@ export interface LiquidacionDueño {
   totalPendiente: number
   /** Suma total neto (listo + pendiente) */
   totalNeto: number
+  /** Monto neto mensual si TODOS los inquilinos del dueño pagaran (referencia) */
+  montoMensualEsperado: number
 }
 
 // ─── Registro de Pagos ───────────────────────────────────────────────────────
