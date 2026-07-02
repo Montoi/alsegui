@@ -611,6 +611,151 @@
   background: currentColor;
 }
 
+/* ── Liquidación a Dueños ──────────────────────── */
+
+.liq-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--md);
+}
+
+.liq-dueno-card {
+  border: 1px solid rgba(43, 168, 162, 0.12);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.liq-dueno-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--md);
+  padding: var(--sm) var(--md);
+  background: rgba(43, 168, 162, 0.05);
+  border-bottom: 1px solid rgba(43, 168, 162, 0.10);
+  flex-wrap: wrap;
+}
+
+.liq-dueno-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+.liq-dueno-meta {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.liq-badge-meses {
+  background: rgba(93, 173, 226, 0.15);
+  color: var(--sky);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-round);
+}
+
+.liq-totales {
+  display: flex;
+  gap: var(--md);
+  flex-wrap: wrap;
+}
+
+.liq-total-listo,
+.liq-total-pendiente {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.liq-total-listo   .liq-total-label { font-size: 11px; color: #1f9050; font-weight: 700; }
+.liq-total-pendiente .liq-total-label { font-size: 11px; color: var(--text-light); font-weight: 700; }
+
+.liq-total-monto {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-dark);
+}
+
+.liq-mes-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.liq-mes-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: var(--xs) var(--sm);
+  border-bottom: 1px solid rgba(43, 168, 162, 0.08);
+}
+
+.liq-mes-table td {
+  padding: 10px var(--sm);
+  font-size: 13px;
+  color: var(--text-dark);
+  border-bottom: 1px solid rgba(43, 168, 162, 0.05);
+  vertical-align: middle;
+}
+
+.liq-mes-table tr:last-child td { border-bottom: none; }
+
+.liq-row-listo   td { background: rgba(39, 174, 96, 0.03); }
+.liq-row-pendiente td { background: transparent; }
+
+.liq-mes-label {
+  font-weight: 700;
+  color: var(--text-dark);
+  white-space: nowrap;
+}
+
+.liq-props {
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.liq-comision { color: var(--coral) !important; }
+.liq-neto     { color: var(--primary-dark) !important; font-weight: 800 !important; }
+
+.liq-accion-cell { text-align: right; white-space: nowrap; }
+
+.liq-total-de-total {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-light);
+}
+
+.btn-entregado {
+  padding: 5px 12px;
+  border: none;
+  border-radius: var(--radius-round);
+  background: rgba(39, 174, 96, 0.12);
+  color: #1f9050;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.1s ease;
+  white-space: nowrap;
+}
+
+.btn-entregado:hover {
+  background: rgba(39, 174, 96, 0.22);
+  transform: scale(1.03);
+}
+
+.btn-entregado:active {
+  transform: scale(0.97);
+}
+
 /* ── Footer ─────────────────────────────────── */
 
 .dash-footer {

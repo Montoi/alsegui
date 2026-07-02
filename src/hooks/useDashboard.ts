@@ -5,7 +5,9 @@ import type {
   EstadoPago,
   KPIs,
   LiquidacionDueño,
+  PagoPorMes,
   Pagos,
+  Entregas,
 } from '../types'
 
 // ─── Utilidades de Fecha ──────────────────────────────────────────────────────
@@ -87,13 +89,18 @@ const PRIORIDAD: Record<EstadoPago, number> = {
  *
  * Es un hook de sólo lectura — no modifica estado directamente.
  */
-export function useDashboard(inquilinos: Inquilino[], pagos: Pagos) {
+export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: Entregas) {
   const today = new Date()
   const mesKey = getMesKey(today)
 
   // ── 1. Estado individual de cada inquilino ───────────────────────────────
 
-  // ── 1. Estado individual de cada inquilino ───────────────────────────────
+  // Mes más antiguo registrado en TODO el sistema (global, no por inquilino)
+  // Se usa como punto de partida para inquilinos sin registros propios.
+  const primerMesGlobal = useMemo(() => {
+    const meses = Object.keys(pagos).sort()
+    return meses.length > 0 ? meses[0] : null
+  }, [pagos])
 
   const inquilinosConEstado = useMemo<InquilinoConEstado[]>(
     () =>
@@ -102,54 +109,70 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos) {
         let month = today.getMonth()
         let haPagado = false
 
-        if (inq.ultimoMesPagado) {
-          const [uYearStr, uMonthStr] = inq.ultimoMesPagado.split('-')
-          let checkYear = parseInt(uYearStr, 10)
-          let checkMonth = parseInt(uMonthStr, 10) // 1-indexed, so it perfectly represents the *next* 0-indexed month
+        // ── Determinar el mes de arranque para buscar el primer impago ───────
+        // 1° Si el inquilino tiene registros propios → su mes más antiguo
+        // 2° Si no tiene registros → mes más antiguo del sistema (así los que
+        //    nunca pagaron junio quedan como atrasados, no como "nuevo en julio")
+        // 3° Fallback final → mes actual
 
-          if (checkMonth > 11) {
-            checkMonth = 0
-            checkYear++
-          }
+        const mesesPropios = Object.keys(pagos)
+          .filter(mes => pagos[mes]?.[inq.id] !== undefined)
+          .sort()
 
-          // Avanzar mes por mes hasta encontrar uno no pagado o superar el mes actual
-          while (
-            checkYear < today.getFullYear() ||
-            (checkYear === today.getFullYear() && checkMonth <= today.getMonth())
-          ) {
-            const mKey = `${checkYear}-${String(checkMonth + 1).padStart(2, '0')}`
-            if (!pagos[mKey]?.[inq.id]) {
-              // Encontramos el primer mes no pagado
-              year = checkYear
-              month = checkMonth
-              break
-            }
-            checkMonth++
-            if (checkMonth > 11) {
-              checkMonth = 0
-              checkYear++
-            }
-          }
+        let checkYear: number
+        let checkMonth: number // 0-indexed
 
-          // Si el loop terminó y llegamos a un mes futuro, significa que ya pagó el mes actual (o más)
-          if (
-            checkYear > today.getFullYear() ||
-            (checkYear === today.getFullYear() && checkMonth > today.getMonth())
-          ) {
-            haPagado = true
-            year = today.getFullYear()
-            month = today.getMonth()
-          }
+        if (mesesPropios.length > 0) {
+          // Arrancar desde el mes más antiguo con registro propio
+          const [yStr, mStr] = mesesPropios[0].split('-')
+          checkYear  = parseInt(yStr, 10)
+          checkMonth = parseInt(mStr, 10) - 1
+        } else if (primerMesGlobal) {
+          // Sin registros propios pero el sistema ya tiene historial →
+          // arrancar desde el primer mes del sistema para detectar meses impagos
+          const [yStr, mStr] = primerMesGlobal.split('-')
+          checkYear  = parseInt(yStr, 10)
+          checkMonth = parseInt(mStr, 10) - 1
+        } else if (inq.ultimoMesPagado) {
+          // Fallback: usar ultimoMesPagado si existe
+          const [yStr, mStr] = inq.ultimoMesPagado.split('-')
+          checkYear  = parseInt(yStr, 10)
+          checkMonth = parseInt(mStr, 10)
+          if (checkMonth > 11) { checkMonth = 0; checkYear++ }
         } else {
-          // Sin ultimoMesPagado, evaluamos el mes actual
-          const mKeyActual = `${year}-${String(month + 1).padStart(2, '0')}`
-          haPagado = pagos[mKeyActual]?.[inq.id] ?? false
+          // Sin ningún historial en absoluto: evaluar desde el mes actual
+          checkYear  = today.getFullYear()
+          checkMonth = today.getMonth()
+        }
+
+        // ── Avanzar mes a mes buscando el primer mes impago ──────────────────
+        let foundUnpaid = false
+        while (
+          checkYear < today.getFullYear() ||
+          (checkYear === today.getFullYear() && checkMonth <= today.getMonth())
+        ) {
+          const mKey = `${checkYear}-${String(checkMonth + 1).padStart(2, '0')}`
+          if (!pagos[mKey]?.[inq.id]) {
+            year  = checkYear
+            month = checkMonth
+            foundUnpaid = true
+            break
+          }
+          checkMonth++
+          if (checkMonth > 11) { checkMonth = 0; checkYear++ }
+        }
+
+        // Si no encontramos ningún mes impago → pagó todo hasta el mes actual
+        if (!foundUnpaid) {
+          haPagado = true
+          year  = today.getFullYear()
+          month = today.getMonth()
         }
 
         const fechaLimite = new Date(year, month, inq.diaPagoMes)
         return calcularEstado(inq, haPagado, fechaLimite, today)
       }),
-    [inquilinos, pagos, today]
+    [inquilinos, pagos, today, primerMesGlobal]
   )
 
   // ── 2. Ordenamiento por prioridad de cobranza ───────────────────────────
@@ -196,39 +219,99 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos) {
     }
   }, [inquilinosConEstado, inquilinos.length])
 
-  // ── 4. Liquidación a Dueños ─────────────────────────────────────────────
-  // Sólo inquilinos que ya pagaron, agrupados por dueño/propiedad.
+  // ── 4. Liquidación a Dueños ──────────────────────────────────────────────
+  // Agrupa TODOS los pagos históricos (cualquier mes) por dueño.
+  // Cada dueño tiene un desglose de meses para mostrar
+  // pagos acumulados de meses distintos pendientes de entregar.
 
   const liquidacionDueños = useMemo<LiquidacionDueño[]>(() => {
-    const pagados = inquilinosConEstado.filter(i => i.estadoPago === 'Pagado')
-    const grupos: Record<string, LiquidacionDueño> = {}
+    // Mapa de inquilino.id → inquilino (para lookup rápido)
+    const inqMap = Object.fromEntries(inquilinos.map(i => [i.id, i]))
     const hoy = new Date()
 
-    for (const inq of pagados) {
-      const key = inq.nombreDueño ?? inq.propiedadAsignada
+    // grupos[dueño][yearMonth] = PagoPorMes
+    const grupos: Record<string, {
+      diaEntregaDueño: number
+      meses: Record<string, PagoPorMes>
+    }> = {}
 
-      if (!grupos[key]) {
-        grupos[key] = {
-          dueño: key,
-          propiedades: [],
-          montoBruto: 0,
-          comisionTotal: 0,
-          montoNeto: 0,
-          diaEntregaDueño: inq.diaEntregaDueño,
-          listo: hoy.getDate() >= inq.diaEntregaDueño,
+    // Recorrer todos los meses en pagos
+    for (const yearMonth of Object.keys(pagos)) {
+      const pagosMes = pagos[yearMonth]
+
+      for (const [inquilinoId, pagado] of Object.entries(pagosMes)) {
+        if (!pagado) continue // solo pagos marcados como true
+
+        const inq = inqMap[inquilinoId]
+        if (!inq) continue
+
+        const keyDueño = inq.nombreDueño ?? inq.propiedadAsignada
+
+        // Inicializar grupo del dueño si no existe
+        if (!grupos[keyDueño]) {
+          grupos[keyDueño] = {
+            diaEntregaDueño: inq.diaEntregaDueño,
+            meses: {},
+          }
         }
-      }
 
-      const comision = inq.montoAlquiler * (inq.comisionPorcentaje / 100)
-      grupos[key].propiedades.push(inq.propiedadAsignada)
-      grupos[key].montoBruto    += inq.montoAlquiler
-      grupos[key].comisionTotal += comision
-      grupos[key].montoNeto     += inq.montoAlquiler - comision
+        // "Listo" = la fecha de entrega DE ESE MES ya pasó (o es hoy)
+        // Ej: junio con día 25 → entregaDate = 25-jun-2026
+        //     Si hoy es 2-jul-2026 → 25-jun < hoy → listo = true ✅
+        //     Si hoy es 2-jul-2026 y mes=julio → entregaDate = 25-jul-2026 → listo = false ⏳
+        const [yStr, mStr] = yearMonth.split('-')
+        const mesAno = parseInt(yStr, 10)
+        const mesNum = parseInt(mStr, 10) - 1 // 0-indexed
+        const fechaEntrega = new Date(mesAno, mesNum, inq.diaEntregaDueño)
+        const listo = hoy >= fechaEntrega
+
+        // Inicializar entrada de ese mes si no existe
+        if (!grupos[keyDueño].meses[yearMonth]) {
+          grupos[keyDueño].meses[yearMonth] = {
+            yearMonth,
+            propiedades: [],
+            montoBruto:    0,
+            comisionTotal: 0,
+            montoNeto:     0,
+            fechaEntrega,
+            listo,
+          }
+        }
+
+        const comision = inq.montoAlquiler * (inq.comisionPorcentaje / 100)
+        const entrada  = grupos[keyDueño].meses[yearMonth]
+        entrada.propiedades.push(inq.propiedadAsignada)
+        entrada.montoBruto    += inq.montoAlquiler
+        entrada.comisionTotal += comision
+        entrada.montoNeto     += inq.montoAlquiler - comision
+      }
     }
 
-    // Ordenar por día de entrega ascendente (el más próximo primero)
-    return Object.values(grupos).sort((a, b) => a.diaEntregaDueño - b.diaEntregaDueño)
-  }, [inquilinosConEstado])
+    // Convertir a array, filtrar meses ya entregados y calcular totales
+    return Object.entries(grupos)
+      .map(([dueño, { diaEntregaDueño, meses }]) => {
+        // Excluir meses que ya fueron marcados como entregados al dueño
+        const entregadosMes = new Set(entregas[dueño] ?? [])
+        const mesesOrdenados = Object.values(meses)
+          .filter(m => !entregadosMes.has(m.yearMonth))
+          .sort((a, b) => a.yearMonth.localeCompare(b.yearMonth))
+
+        if (mesesOrdenados.length === 0) return null // ocultar si no quedan meses
+
+        const totalListo     = mesesOrdenados.filter(m => m.listo).reduce((s, m) => s + m.montoNeto, 0)
+        const totalPendiente = mesesOrdenados.filter(m => !m.listo).reduce((s, m) => s + m.montoNeto, 0)
+        return {
+          dueño,
+          diaEntregaDueño,
+          meses: mesesOrdenados,
+          totalListo,
+          totalPendiente,
+          totalNeto: totalListo + totalPendiente,
+        } satisfies LiquidacionDueño
+      })
+      .filter((x): x is LiquidacionDueño => x !== null)
+      .sort((a, b) => a.diaEntregaDueño - b.diaEntregaDueño)
+  }, [inquilinos, pagos, entregas])
 
   return {
     today,

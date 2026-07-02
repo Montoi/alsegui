@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { Inquilino, Pagos } from '../types'
+import type { Inquilino, Pagos, Entregas } from '../types'
 
 /**
  * Hook de Administración.
@@ -9,6 +9,7 @@ import type { Inquilino, Pagos } from '../types'
 export function useAdministracion() {
   const [inquilinos, setInquilinos] = useState<Inquilino[]>([])
   const [pagos, setPagos] = useState<Pagos>({})
+  const [entregas, setEntregas] = useState<Entregas>({})
   const [loading, setLoading] = useState(true)
 
   // ─── Carga Inicial ──────────────────────────────────────────────────────────
@@ -37,17 +38,30 @@ export function useAdministracion() {
     }
   }, [])
 
+  const fetchEntregas = useCallback(async () => {
+    try {
+      const res = await fetch('/api/entregas')
+      if (res.ok) {
+        const data = await res.json()
+        setEntregas(data)
+      }
+    } catch (err) {
+      console.error('Error fetching entregas:', err)
+    }
+  }, [])
+
   useEffect(() => {
     const init = async () => {
       setLoading(true)
       await Promise.all([
         fetchInquilinos(),
-        fetchTodosPagos()
+        fetchTodosPagos(),
+        fetchEntregas(),
       ])
       setLoading(false)
     }
     init()
-  }, [fetchInquilinos, fetchTodosPagos])
+  }, [fetchInquilinos, fetchTodosPagos, fetchEntregas])
 
   // ─── CRUD de Inquilinos ─────────────────────────────────────────────────────
 
@@ -132,14 +146,45 @@ export function useAdministracion() {
     }
   }
 
+  // ─── Registro de Entregas a Dueños ─────────────────────────────────────────
+
+  async function marcarEntrega(duenoKey: string, yearMonth: string, entregado: boolean): Promise<void> {
+    // Actualización optimista local
+    setEntregas(prev => {
+      const meses = prev[duenoKey] ?? []
+      return {
+        ...prev,
+        [duenoKey]: entregado
+          ? [...meses.filter(m => m !== yearMonth), yearMonth]
+          : meses.filter(m => m !== yearMonth),
+      }
+    })
+
+    try {
+      const res = await fetch('/api/entregas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duenoKey, yearMonth, entregado }),
+      })
+      if (!res.ok) {
+        await fetchEntregas()
+      }
+    } catch (err) {
+      console.error('Error registering entrega:', err)
+      await fetchEntregas()
+    }
+  }
+
   return {
     inquilinos,
     pagos,
+    entregas,
     loading,
     agregarInquilino,
     editarInquilino,
     eliminarInquilino,
     registrarPago,
+    marcarEntrega,
     fetchTodosPagos, // Exportado por si otras vistas necesitan cargar historial
   }
 }

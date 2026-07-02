@@ -1,13 +1,15 @@
 import { useDashboard } from '../hooks/useDashboard'
-import type { Inquilino, Pagos, InquilinoConEstado, EstadoPago } from '../types'
-import { getInitials, getAvatarColor, formatMonto, formatMes, formatFecha } from '../utils/format'
+import type { Inquilino, Pagos, Entregas, InquilinoConEstado, EstadoPago } from '../types'
+import { getInitials, getAvatarColor, formatMonto, formatMes, formatFecha, formatYearMonth } from '../utils/format'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface DashboardProps {
   inquilinos: Inquilino[]
   pagos: Pagos
+  entregas: Entregas
   registrarPago: (inquilinoId: string, yearMonth: string, pagado: boolean) => void
+  marcarEntrega: (duenoKey: string, yearMonth: string, entregado: boolean) => void
 }
 
 // ─── Helpers de UI ────────────────────────────────────────────────────────────
@@ -74,9 +76,9 @@ function FilaPago({ inq, mesKey, onPago }: FilaPagoProps) {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-export default function Dashboard({ inquilinos, pagos, registrarPago }: DashboardProps) {
+export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, marcarEntrega }: DashboardProps) {
   const { today, mesKey, inquilinosOrdenados, kpis, liquidacionDueños } =
-    useDashboard(inquilinos, pagos)
+    useDashboard(inquilinos, pagos, entregas)
 
   const mesLabel = formatMes(today)
 
@@ -219,53 +221,109 @@ export default function Dashboard({ inquilinos, pagos, registrarPago }: Dashboar
         )}
       </div>
 
-      {/* ── Tabla: Liquidación a Dueños ── */}
+      {/* ── Liquidación a Dueños ── */}
       {liquidacionDueños.length > 0 && (
         <div className="activity-card">
           <div className="activity-header">
             <div>
               <h3 className="chart-title">🏦 Liquidación a Dueños</h3>
               <p className="chart-sub">
-                Sólo inquilinos con estado Pagado · Ordenado por día de entrega
+                Dinero cobrado de inquilinos · Agrupado por mes y dueño
               </p>
             </div>
           </div>
-          <table className="activity-table">
-            <thead>
-              <tr>
-                <th>Dueño / Propiedad</th>
-                <th>Monto Bruto</th>
-                <th>Comisión</th>
-                <th>Monto Neto</th>
-                <th>Día de Entrega</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {liquidacionDueños.map((liq, i) => (
-                <tr key={i} id={`liq-${i}`}>
-                  <td>
-                    <div className="user-name">{liq.dueño}</div>
-                    <div className="user-email">{liq.propiedades.join(' · ')}</div>
-                  </td>
-                  <td className="plan-cell">{formatMonto(liq.montoBruto)}</td>
-                  <td className="plan-cell liq-comision">− {formatMonto(liq.comisionTotal)}</td>
-                  <td className="plan-cell liq-neto">{formatMonto(liq.montoNeto)}</td>
-                  <td className="plan-cell">Día {liq.diaEntregaDueño}</td>
-                  <td>
-                    <span
-                      className={`status-badge ${
-                        liq.listo ? 'status-success' : 'estado-pendiente'
-                      }`}
-                    >
-                      <span className="status-dot" />
-                      {liq.listo ? 'Listo para pagar' : 'Pendiente entrega'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+          <div className="liq-grid">
+            {liquidacionDueños.map((liq, i) => (
+              <div key={i} className="liq-dueno-card" id={`liq-${i}`}>
+
+                {/* ── Cabecera del dueño ── */}
+                <div className="liq-dueno-header">
+                  <div>
+                    <div className="liq-dueno-name">{liq.dueño}</div>
+                    <div className="liq-dueno-meta">
+                      Día de entrega: {liq.diaEntregaDueño} de cada mes
+                      {liq.meses.length > 1 && (
+                        <span className="liq-badge-meses">
+                          {liq.meses.length} meses acumulados
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="liq-totales">
+                    {liq.totalListo > 0 && (
+                      <div className="liq-total-listo">
+                        <span className="liq-total-label">✅ Pagar ahora al dueño</span>
+                        <span className="liq-total-monto">
+                          {formatMonto(liq.totalListo)}
+                          {liq.totalNeto > liq.totalListo && (
+                            <span className="liq-total-de-total"> / {formatMonto(liq.totalNeto)}</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    {liq.totalPendiente > 0 && (
+                      <div className="liq-total-pendiente">
+                        <span className="liq-total-label">📅 Pagar al dueño el día {liq.diaEntregaDueño}</span>
+                        <span className="liq-total-monto">{formatMonto(liq.totalPendiente)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Desglose por mes ── */}
+                <table className="liq-mes-table">
+                  <thead>
+                    <tr>
+                      <th>Mes cobrado</th>
+                      <th>Propiedades</th>
+                      <th>Bruto</th>
+                      <th>Comisión</th>
+                      <th>Neto a entregar</th>
+                      <th>Cuándo pagar al dueño</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {liq.meses.map((mes) => (
+                      <tr key={mes.yearMonth} className={mes.listo ? 'liq-row-listo' : 'liq-row-pendiente'}>
+                        <td className="liq-mes-label">{formatYearMonth(mes.yearMonth)}</td>
+                        <td className="liq-props">{mes.propiedades.join(' · ')}</td>
+                        <td className="plan-cell">{formatMonto(mes.montoBruto)}</td>
+                        <td className="plan-cell liq-comision">− {formatMonto(mes.comisionTotal)}</td>
+                        <td className="plan-cell liq-neto">{formatMonto(mes.montoNeto)}</td>
+                        <td>
+                          {mes.listo ? (
+                            <span className="status-badge status-success">
+                              <span className="status-dot" />
+                              Pagar ahora
+                            </span>
+                          ) : (
+                            <span className="status-badge estado-pendiente">
+                              <span className="status-dot" />
+                              El {mes.fechaEntrega.toLocaleDateString('es-DO', { day: 'numeric', month: 'short' })}
+                            </span>
+                          )}
+                        </td>
+                        <td className="liq-accion-cell">
+                          {mes.listo && (
+                            <button
+                              className="btn-entregado"
+                              title="Marcar como pagado al dueño (desaparece de la tabla)"
+                              onClick={() => marcarEntrega(liq.dueño, mes.yearMonth, true)}
+                            >
+                              ✓ Ya pagué al dueño
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </>

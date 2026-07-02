@@ -3,7 +3,8 @@ import express from 'express'
 import cors from 'cors'
 import pool from './db.js'
 import inquilinosRouter from './routes/inquilinos.js'
-import pagosRouter from './routes/pagos.js'
+import pagosRouter     from './routes/pagos.js'
+import entregasRouter  from './routes/entregas.js'
 
 const app  = express()
 const PORT = process.env.PORT ?? 3001
@@ -23,6 +24,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/inquilinos', inquilinosRouter)
 app.use('/api/pagos',      pagosRouter)
+app.use('/api/entregas',   entregasRouter)
 
 // ── 404 genérico ──────────────────────────────────────────────────────────────
 
@@ -41,6 +43,17 @@ async function start() {
     await pool.query(`
       ALTER TABLE inquilinos 
       ADD COLUMN IF NOT EXISTS ultimo_mes_pagado TEXT;
+    `)
+
+    // Migración: tabla de entregas a dueños
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS entregas_dueno (
+        id         SERIAL      PRIMARY KEY,
+        dueno_key  TEXT        NOT NULL,
+        year_month TEXT        NOT NULL,
+        fecha      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (dueno_key, year_month)
+      );
     `)
     
     console.log('✅ Conexión a PostgreSQL establecida y BD migrada')

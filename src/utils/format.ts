@@ -35,3 +35,11 @@ export function formatMes(date: Date): string {
   const str = date.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' })
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
+
+/** Convierte "YYYY-MM" a "Junio 2026" */
+export function formatYearMonth(yearMonth: string): string {
+  const [y, m] = yearMonth.split('-')
+  const date = new Date(parseInt(y), parseInt(m) - 1, 1)
+  const str = date.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' })
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}

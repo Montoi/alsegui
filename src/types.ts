@@ -53,18 +53,38 @@ export interface KPIs {
 
 // ─── Liquidación a Dueños ────────────────────────────────────────────────────
 
-export interface LiquidacionDueño {
-  dueño: string
+/** Un mes de cobro dentro de la liquidación de un dueño */
+export interface PagoPorMes {
+  /** Clave "YYYY-MM" */
+  yearMonth: string
   propiedades: string[]
   montoBruto: number
   comisionTotal: number
   montoNeto: number
-  diaEntregaDueño: number
-  /** true si today.getDate() >= diaEntregaDueño */
+  /** true si hoy >= diaEntregaDueño para ese mes */
   listo: boolean
+}
+
+export interface LiquidacionDueño {
+  dueño: string
+  diaEntregaDueño: number
+  /** Desglose de pagos cobrados por mes, cronológico */
+  meses: PagoPorMes[]
+  /** Suma de todos los meses con listo=true */
+  totalListo: number
+  /** Suma de todos los meses con listo=false */
+  totalPendiente: number
+  /** Suma total neto (listo + pendiente) */
+  totalNeto: number
 }
 
 // ─── Registro de Pagos ───────────────────────────────────────────────────────
 // Formato: { "2026-06": { "inq-1": true, "inq-2": false } }
 
 export type Pagos = Record<string, Record<string, boolean>>
+
+// ─── Entregas a Dueños ───────────────────────────────────────────────────────
+// Formato: { "María": ["2026-06"], "Jairo": ["2026-05", "2026-06"] }
+// Indica qué meses ya fueron pagados/entregados al dueño.
+
+export type Entregas = Record<string, string[]>

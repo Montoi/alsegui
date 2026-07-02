@@ -17,10 +17,12 @@ export default function App() {
   const {
     inquilinos,
     pagos,
+    entregas,
     agregarInquilino,
     editarInquilino,
     eliminarInquilino,
     registrarPago,
+    marcarEntrega,
   } = useAdministracion()
 
   return (
@@ -44,7 +46,9 @@ export default function App() {
             <Dashboard
               inquilinos={inquilinos}
               pagos={pagos}
+              entregas={entregas}
               registrarPago={registrarPago}
+              marcarEntrega={marcarEntrega}
             />
           )}
 
