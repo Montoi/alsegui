@@ -61,7 +61,9 @@ export interface PagoPorMes {
   montoBruto: number
   comisionTotal: number
   montoNeto: number
-  /** true si hoy >= diaEntregaDueño para ese mes */
+  /** Fecha exacta en que debes transferir al dueño (día de entrega de ese mes) */
+  fechaEntrega: Date
+  /** true si hoy >= fechaEntrega */
   listo: boolean
 }
 
