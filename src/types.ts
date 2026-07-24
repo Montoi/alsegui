@@ -20,6 +20,8 @@ export interface Inquilino {
   diaEntregaDueño: number
   /** Último mes pagado en formato YYYY-MM */
   ultimoMesPagado?: string
+  /** true si el inquilino paga a mes vencido (ej. paga julio en agosto) */
+  pagaMesVencido?: boolean
 }
 
 // ─── Estados de Pago ──────────────────────────────────────────────────────────

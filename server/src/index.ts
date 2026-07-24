@@ -39,10 +39,11 @@ async function start() {
   try {
     await pool.query('SELECT 1')
     
-    // Migración automática: agregar ultimo_mes_pagado si no existe
+    // Migración automática: agregar ultimo_mes_pagado y paga_mes_vencido si no existen
     await pool.query(`
       ALTER TABLE inquilinos 
-      ADD COLUMN IF NOT EXISTS ultimo_mes_pagado TEXT;
+      ADD COLUMN IF NOT EXISTS ultimo_mes_pagado TEXT,
+      ADD COLUMN IF NOT EXISTS paga_mes_vencido BOOLEAN DEFAULT false;
     `)
 
     // Migración: tabla de entregas a dueños

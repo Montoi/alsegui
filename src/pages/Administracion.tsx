@@ -172,6 +172,20 @@ function FormularioInquilino({ inicial, modo, onSubmit, onCancelar }: Formulario
               {errores.diaPagoMes && <span className="field-error">{errores.diaPagoMes}</span>}
             </div>
 
+            {/* Paga a mes vencido */}
+            <div className="settings-field" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                id="f-mesvencido"
+                type="checkbox"
+                checked={form.pagaMesVencido || false}
+                onChange={e => set('pagaMesVencido', e.target.checked)}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <label htmlFor="f-mesvencido" style={{ marginBottom: 0, cursor: 'pointer' }}>
+                Paga a mes vencido (ej. paga Julio en Agosto)
+              </label>
+            </div>
+
             {/* Día entrega dueño */}
             <div className="settings-field">
               <label htmlFor="f-diaentrega">Día de Entrega al Dueño (1–31) *</label>

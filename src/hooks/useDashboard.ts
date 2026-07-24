@@ -137,7 +137,9 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
 
       const inqsConEstado = inquilinos.map(inq => {
         const haPagado = !!pagos[mKey]?.[inq.id]
-        const fechaLimite = new Date(targetYear, targetMonth, inq.diaPagoMes)
+        // Si paga a mes vencido, la fecha límite es en el mes siguiente
+        const mesOffset = inq.pagaMesVencido ? 1 : 0
+        const fechaLimite = new Date(targetYear, targetMonth + mesOffset, inq.diaPagoMes)
         return calcularEstado(inq, haPagado, fechaLimite, today)
       })
 
