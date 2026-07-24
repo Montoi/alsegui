@@ -9,6 +9,7 @@ import type {
   Pagos,
   Entregas,
 } from '../types'
+import { formatYearMonth } from '../utils/format'
 
 // ─── Utilidades de Fecha ──────────────────────────────────────────────────────
 
@@ -102,124 +103,97 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
     return meses.length > 0 ? meses[0] : null
   }, [pagos])
 
-  const inquilinosConEstado = useMemo<InquilinoConEstado[]>(
-    () =>
-      inquilinos.map(inq => {
-        let year = today.getFullYear()
-        let month = today.getMonth()
-        let haPagado = false
+  // ── 1. Tablas mensuales (Historial de impagos + Mes actual) ────────────────
+  const tablasMensuales = useMemo(() => {
+    const startKey = primerMesGlobal || mesKey
+    const endKey = mesKey
 
-        // ── Determinar el mes de arranque para buscar el primer impago ───────
-        // 1° Si el inquilino tiene registros propios → su mes más antiguo
-        // 2° Si no tiene registros → mes más antiguo del sistema (así los que
-        //    nunca pagaron junio quedan como atrasados, no como "nuevo en julio")
-        // 3° Fallback final → mes actual
+    const range: string[] = []
+    let [sYear, sMonth] = startKey.split('-').map(Number)
+    const [eYear, eMonth] = endKey.split('-').map(Number)
 
-        const mesesPropios = Object.keys(pagos)
-          .filter(mes => pagos[mes]?.[inq.id] !== undefined)
-          .sort()
+    while (sYear < eYear || (sYear === eYear && sMonth <= eMonth)) {
+      range.push(`${sYear}-${String(sMonth).padStart(2, '0')}`)
+      sMonth++
+      if (sMonth > 12) {
+        sMonth = 1
+        sYear++
+      }
+    }
 
-        let checkYear: number
-        let checkMonth: number // 0-indexed
+    return range.map(mKey => {
+      const [yStr, mStr] = mKey.split('-')
+      const targetYear = parseInt(yStr, 10)
+      const targetMonth = parseInt(mStr, 10) - 1
 
-        if (mesesPropios.length > 0) {
-          // Arrancar desde el mes más antiguo con registro propio
-          const [yStr, mStr] = mesesPropios[0].split('-')
-          checkYear  = parseInt(yStr, 10)
-          checkMonth = parseInt(mStr, 10) - 1
-        } else if (primerMesGlobal) {
-          // Sin registros propios pero el sistema ya tiene historial →
-          // arrancar desde el primer mes del sistema para detectar meses impagos
-          const [yStr, mStr] = primerMesGlobal.split('-')
-          checkYear  = parseInt(yStr, 10)
-          checkMonth = parseInt(mStr, 10) - 1
-        } else if (inq.ultimoMesPagado) {
-          // Fallback: usar ultimoMesPagado si existe
-          const [yStr, mStr] = inq.ultimoMesPagado.split('-')
-          checkYear  = parseInt(yStr, 10)
-          checkMonth = parseInt(mStr, 10)
-          if (checkMonth > 11) { checkMonth = 0; checkYear++ }
-        } else {
-          // Sin ningún historial en absoluto: evaluar desde el mes actual
-          checkYear  = today.getFullYear()
-          checkMonth = today.getMonth()
-        }
-
-        // ── Avanzar mes a mes buscando el primer mes impago ──────────────────
-        let foundUnpaid = false
-        while (
-          checkYear < today.getFullYear() ||
-          (checkYear === today.getFullYear() && checkMonth <= today.getMonth())
-        ) {
-          const mKey = `${checkYear}-${String(checkMonth + 1).padStart(2, '0')}`
-          if (!pagos[mKey]?.[inq.id]) {
-            year  = checkYear
-            month = checkMonth
-            foundUnpaid = true
-            break
-          }
-          checkMonth++
-          if (checkMonth > 11) { checkMonth = 0; checkYear++ }
-        }
-
-        // Si no encontramos ningún mes impago → pagó todo hasta el mes actual
-        if (!foundUnpaid) {
-          haPagado = true
-          year  = today.getFullYear()
-          month = today.getMonth()
-        }
-
-        const fechaLimite = new Date(year, month, inq.diaPagoMes)
+      const inqsConEstado = inquilinos.map(inq => {
+        const haPagado = !!pagos[mKey]?.[inq.id]
+        const fechaLimite = new Date(targetYear, targetMonth, inq.diaPagoMes)
         return calcularEstado(inq, haPagado, fechaLimite, today)
-      }),
-    [inquilinos, pagos, today, primerMesGlobal]
-  )
+      })
 
-  // ── 2. Ordenamiento por prioridad de cobranza ───────────────────────────
-  //   1° Atrasados (más días vencidos primero)
-  //   2° En Período de Gracia
-  //   3° Pendientes (más cercano a vencer primero)
-  //   4° Pagados al final
-
-  const inquilinosOrdenados = useMemo<InquilinoConEstado[]>(
-    () =>
-      [...inquilinosConEstado].sort((a, b) => {
+      const inqsOrdenados = [...inqsConEstado].sort((a, b) => {
         const pDiff = PRIORIDAD[a.estadoPago] - PRIORIDAD[b.estadoPago]
         if (pDiff !== 0) return pDiff
-        // Dentro del mismo grupo: diasDiferencia ascendente
-        // • Atrasados: más negativo primero → mayor atraso primero ✓
-        // • Pendientes: menor positivo primero → más cercano primero ✓
         return a.diasDiferencia - b.diasDiferencia
-      }),
-    [inquilinosConEstado]
-  )
+      })
 
-  // ── 3. KPIs Globales del Mes ────────────────────────────────────────────
+      const esMesActual = mKey === mesKey
+      const inqsFiltrados = esMesActual
+        ? inqsOrdenados
+        : inqsOrdenados.filter(i => !i.haPagado)
 
+      return {
+        mesKey: mKey,
+        mesLabel: formatYearMonth(mKey),
+        inquilinos: inqsFiltrados,
+      }
+    })
+  }, [inquilinos, pagos, primerMesGlobal, mesKey, today])
+
+  // ── 2. KPIs Globales del Mes Actual y Morosidad Histórica ────────────────
   const kpis = useMemo<KPIs>(() => {
-    const pagados  = inquilinosConEstado.filter(i => i.estadoPago === 'Pagado')
-    const atrasados = inquilinosConEstado.filter(i => i.estadoPago === 'Atrasado')
+    // Para ingresos y ganancias: evaluar sólo el mes actual
+    const inquilinosMesActual = inquilinos.map(inq => {
+      const haPagado = !!pagos[mesKey]?.[inq.id]
+      const [yStr, mStr] = mesKey.split('-')
+      const targetYear = parseInt(yStr, 10)
+      const targetMonth = parseInt(mStr, 10) - 1
+      const fechaLimite = new Date(targetYear, targetMonth, inq.diaPagoMes)
+      return calcularEstado(inq, haPagado, fechaLimite, today)
+    })
 
-    const ingresosBrutos = pagados.reduce((s, i) => s + i.montoAlquiler, 0)
-    const ganancias      = pagados.reduce(
+    const pagadosMesActual = inquilinosMesActual.filter(i => i.estadoPago === 'Pagado')
+    const ingresosBrutos = pagadosMesActual.reduce((s, i) => s + i.montoAlquiler, 0)
+    const ganancias = pagadosMesActual.reduce(
       (s, i) => s + i.montoAlquiler * (i.comisionPorcentaje / 100),
       0
     )
+
+    // Para morosidad: un inquilino está Atrasado si tiene estado 'Atrasado' en CUALQUIER tabla mensual activa
+    const inqsAtrasadosUnicos = new Set<string>()
+    for (const tabla of tablasMensuales) {
+      for (const inq of tabla.inquilinos) {
+        if (inq.estadoPago === 'Atrasado') {
+          inqsAtrasadosUnicos.add(inq.id)
+        }
+      }
+    }
 
     return {
       totalPropiedades: inquilinos.length,
       ingresosBrutos,
       ganancias,
       totalNetoEntregarDueños: ingresosBrutos - ganancias,
-      cantidadAtrasados: atrasados.length,
+      cantidadAtrasados: inqsAtrasadosUnicos.size,
       tasaMorosidad:
         inquilinos.length > 0
-          ? Math.round((atrasados.length / inquilinos.length) * 100)
+          ? Math.round((inqsAtrasadosUnicos.size / inquilinos.length) * 100)
           : 0,
     }
-  }, [inquilinosConEstado, inquilinos.length])
+  }, [inquilinos, pagos, mesKey, today, tablasMensuales])
 
-  // ── 4. Liquidación a Dueños ──────────────────────────────────────────────
+  // ── 3. Liquidación a Dueños ──────────────────────────────────────────────
   // Agrupa TODOS los pagos históricos (cualquier mes) por dueño.
   // Cada dueño tiene un desglose de meses para mostrar
   // pagos acumulados de meses distintos pendientes de entregar.
@@ -264,9 +238,6 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
         }
 
         // "Listo" = la fecha de entrega DE ESE MES ya pasó (o es hoy)
-        // Ej: junio con día 25 → entregaDate = 25-jun-2026
-        //     Si hoy es 2-jul-2026 → 25-jun < hoy → listo = true ✅
-        //     Si hoy es 2-jul-2026 y mes=julio → entregaDate = 25-jul-2026 → listo = false ⏳
         const [yStr, mStr] = yearMonth.split('-')
         const mesAno = parseInt(yStr, 10)
         const mesNum = parseInt(mStr, 10) - 1 // 0-indexed
@@ -325,8 +296,7 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
   return {
     today,
     mesKey,
-    inquilinosConEstado,
-    inquilinosOrdenados,
+    tablasMensuales,
     kpis,
     liquidacionDueños,
   }

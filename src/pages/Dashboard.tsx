@@ -77,10 +77,12 @@ function FilaPago({ inq, mesKey, onPago }: FilaPagoProps) {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, marcarEntrega }: DashboardProps) {
-  const { today, mesKey, inquilinosOrdenados, kpis, liquidacionDueños } =
+  const { today, mesKey, tablasMensuales, kpis, liquidacionDueños } =
     useDashboard(inquilinos, pagos, entregas)
 
   const mesLabel = formatMes(today)
+  const tablaActual = tablasMensuales.find(t => t.mesKey === mesKey)
+  const pagadosCount = tablaActual ? tablaActual.inquilinos.filter(i => i.estadoPago === 'Pagado').length : 0
 
   // ── KPI Card data ──────────────────────────────────────────────────────────
 
@@ -102,7 +104,7 @@ export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, 
       icon: '💰',
       iconBg: 'rgba(255,210,63,0.15)',
       iconColor: '#C49A00',
-      badge: `${inquilinosOrdenados.filter(i => i.estadoPago === 'Pagado').length} pagados`,
+      badge: `${pagadosCount} pagados`,
       badgeCls: 'badge-pos',
     },
     {
@@ -170,24 +172,9 @@ export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, 
         ))}
       </div>
 
-      {/* ── Tabla: Próximos Pagos ── */}
-      <div className="activity-card">
-        <div className="activity-header">
-          <div>
-            <h3 className="chart-title">📋 Próximos Pagos — {mesLabel}</h3>
-            <p className="chart-sub">
-              Ordenado por prioridad: Atrasados → Gracia → Pendientes → Pagados
-            </p>
-          </div>
-          <div className="dash-legend">
-            <span className="status-badge estado-atrasado"><span className="status-dot" />Atrasado</span>
-            <span className="status-badge estado-gracia"><span className="status-dot" />En Gracia</span>
-            <span className="status-badge estado-pendiente"><span className="status-dot" />Pendiente</span>
-            <span className="status-badge estado-pagado"><span className="status-dot" />Pagado</span>
-          </div>
-        </div>
-
-        {inquilinos.length === 0 ? (
+      {/* ── Tablas de Pagos por Mes ── */}
+      {inquilinos.length === 0 ? (
+        <div className="activity-card">
           <div className="empty-state">
             <span>🏠</span>
             <p>
@@ -196,30 +183,60 @@ export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, 
               Agrega uno desde el módulo de Administración.
             </p>
           </div>
-        ) : (
-          <table className="activity-table">
-            <thead>
-              <tr>
-                <th>Inquilino</th>
-                <th>Monto</th>
-                <th>Día de Pago</th>
-                <th>Estado</th>
-                <th>Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inquilinosOrdenados.map(inq => (
-                <FilaPago
-                  key={inq.id}
-                  inq={inq}
-                  mesKey={mesKey}
-                  onPago={registrarPago}
-                />
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+        </div>
+      ) : (
+        tablasMensuales.map(tabla => {
+          // Si no es el mes actual y no hay inquilinos pendientes en el pasado, no mostrar la tabla
+          if (tabla.mesKey !== mesKey && tabla.inquilinos.length === 0) {
+            return null
+          }
+
+          const esMesActual = tabla.mesKey === mesKey
+
+          return (
+            <div key={tabla.mesKey} className="activity-card" style={{ marginBottom: '2rem' }}>
+              <div className="activity-header">
+                <div>
+                  <h3 className="chart-title">📋 Próximos Pagos — {tabla.mesLabel}</h3>
+                  <p className="chart-sub">
+                    {esMesActual
+                      ? "Mes actual. Ordenado por prioridad: Atrasados → Gracia → Pendientes → Pagados"
+                      : "Pagos pendientes de meses anteriores"}
+                  </p>
+                </div>
+                <div className="dash-legend">
+                  <span className="status-badge estado-atrasado"><span className="status-dot" />Atrasado</span>
+                  <span className="status-badge estado-gracia"><span className="status-dot" />En Gracia</span>
+                  <span className="status-badge estado-pendiente"><span className="status-dot" />Pendiente</span>
+                  <span className="status-badge estado-pagado"><span className="status-dot" />Pagado</span>
+                </div>
+              </div>
+
+              <table className="activity-table">
+                <thead>
+                  <tr>
+                    <th>Inquilino</th>
+                    <th>Monto</th>
+                    <th>Día de Pago</th>
+                    <th>Estado</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tabla.inquilinos.map(inq => (
+                    <FilaPago
+                      key={inq.id}
+                      inq={inq}
+                      mesKey={tabla.mesKey}
+                      onPago={registrarPago}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        })
+      )}
 
       {/* ── Liquidación a Dueños ── */}
       {liquidacionDueños.length > 0 && (
