@@ -307,6 +307,8 @@ export default function Administracion({
         comisionPorcentaje: inquilinoEditando.comisionPorcentaje,
         diaPagoMes: inquilinoEditando.diaPagoMes,
         diaEntregaDueño: inquilinoEditando.diaEntregaDueño,
+        pagaMesVencido: inquilinoEditando.pagaMesVencido,
+        ultimoMesPagado: inquilinoEditando.ultimoMesPagado,
       }
     : FORM_VACIO
 
