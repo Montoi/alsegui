@@ -253,7 +253,8 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
 
         const [yStr, mStr] = yearMonth.split('-')
         const mesAno = parseInt(yStr, 10)
-        const mesNum = parseInt(mStr, 10) - 1 // 0-indexed
+        // parseInt(mStr, 10) desplaza el mes hacia adelante por 1 mes (ya que Date usa base 0)
+        const mesNum = parseInt(mStr, 10)
         const fechaEntrega = new Date(mesAno, mesNum, grupos[keyDueño].diaEntregaDueño)
 
         const monthEntry: PagoPorMes = {

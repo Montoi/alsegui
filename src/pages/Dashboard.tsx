@@ -1,7 +1,6 @@
-import { useState } from 'react'
 import { useDashboard } from '../hooks/useDashboard'
-import type { Inquilino, Pagos, Entregas, InquilinoConEstado, EstadoPago } from '../types'
-import { getInitials, getAvatarColor, formatMonto, formatMes, formatFecha, formatYearMonth } from '../utils/format'
+import type { Inquilino, Pagos, Entregas } from '../types'
+import { formatMonto, formatMes, formatYearMonth } from '../utils/format'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -22,7 +21,6 @@ export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, 
   const { today, mesKey, tablasMensuales, kpis, liquidacionDueños } =
     useDashboard(inquilinos, pagos, entregas)
 
-  const [mostrarPagados, setMostrarPagados] = useState<Record<string, boolean>>({})
   const mesLabel = formatMes(today)
   const tablaActual = tablasMensuales.find(t => t.mesKey === mesKey)
   const pagadosCount = tablaActual ? tablaActual.inquilinos.filter(i => i.estadoPago === 'Pagado').length : 0
