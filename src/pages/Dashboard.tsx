@@ -1,6 +1,6 @@
 import { useDashboard } from '../hooks/useDashboard'
 import type { Inquilino, Pagos, Entregas } from '../types'
-import { formatMonto, formatMes, formatYearMonth } from '../utils/format'
+import { formatMonto, formatMes, formatYearMonth, formatFecha } from '../utils/format'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
