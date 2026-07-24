@@ -13,6 +13,11 @@ import type { Page } from './types'
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [mesesFijados, setMesesFijados] = useState<string[]>([])
+
+  const toggleMesFijado = (mes: string) => {
+    setMesesFijados(prev => prev.includes(mes) ? prev.filter(m => m !== mes) : [...prev, mes])
+  }
 
   const {
     inquilinos,
@@ -49,15 +54,21 @@ export default function App() {
               entregas={entregas}
               registrarPago={registrarPago}
               marcarEntrega={marcarEntrega}
+              mesesFijados={mesesFijados}
             />
           )}
 
           {page === 'administracion' && (
             <Administracion
               inquilinos={inquilinos}
+              pagos={pagos}
+              entregas={entregas}
+              registrarPago={registrarPago}
               onAgregar={agregarInquilino}
               onEditar={editarInquilino}
               onEliminar={eliminarInquilino}
+              mesesFijados={mesesFijados}
+              toggleMesFijado={toggleMesFijado}
             />
           )}
 

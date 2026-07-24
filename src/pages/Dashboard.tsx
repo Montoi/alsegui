@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useDashboard } from '../hooks/useDashboard'
 import type { Inquilino, Pagos, Entregas, InquilinoConEstado, EstadoPago } from '../types'
 import { getInitials, getAvatarColor, formatMonto, formatMes, formatFecha, formatYearMonth } from '../utils/format'
@@ -10,79 +11,24 @@ interface DashboardProps {
   entregas: Entregas
   registrarPago: (inquilinoId: string, yearMonth: string, pagado: boolean) => void
   marcarEntrega: (duenoKey: string, yearMonth: string, entregado: boolean) => void
+  mesesFijados?: string[]
 }
 
-// ─── Helpers de UI ────────────────────────────────────────────────────────────
-
-function getEstadoClass(estado: EstadoPago): string {
-  switch (estado) {
-    case 'Pagado':         return 'estado-pagado'
-    case 'Pendiente':      return 'estado-pendiente'
-    case 'PeriodoDeGracia': return 'estado-gracia'
-    case 'Atrasado':       return 'estado-atrasado'
-  }
-}
-
-// ─── Sub-componente: Fila de Pago ────────────────────────────────────────────
-
-interface FilaPagoProps {
-  inq: InquilinoConEstado
-  mesKey: string
-  onPago: (id: string, mes: string, pagado: boolean) => void
-}
-
-function FilaPago({ inq, mesKey, onPago }: FilaPagoProps) {
-  return (
-    <tr id={`pago-${inq.id}`} className={inq.estadoPago === 'Pagado' ? 'row-pagado' : ''}>
-      <td>
-        <div className="user-cell">
-          <div className="table-avatar" style={{ background: getAvatarColor(inq.id) }}>
-            {getInitials(inq.nombre)}
-          </div>
-          <div>
-            <div className="user-name">{inq.nombre}</div>
-            <div className="user-email">{inq.propiedadAsignada}</div>
-          </div>
-        </div>
-      </td>
-      <td className="plan-cell">{formatMonto(inq.montoAlquiler)}</td>
-      <td className="plan-cell">Día {inq.diaPagoMes}</td>
-      <td>
-        <span className={`status-badge ${getEstadoClass(inq.estadoPago)}`}>
-          <span className="status-dot" />
-          {inq.etiquetaEstado}
-        </span>
-      </td>
-      <td>
-        {inq.estadoPago === 'Pagado' ? (
-          <button
-            className="btn-desmarcar"
-            onClick={() => onPago(inq.id, mesKey, false)}
-          >
-            Desmarcar
-          </button>
-        ) : (
-          <button
-            className="btn-marcar-pagado"
-            onClick={() => onPago(inq.id, mesKey, true)}
-          >
-            ✓ Marcar Pagado
-          </button>
-        )}
-      </td>
-    </tr>
-  )
-}
+import { FilaPago } from '../components/FilaPago'
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, marcarEntrega }: DashboardProps) {
+export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, marcarEntrega, mesesFijados = [] }: DashboardProps) {
   const { today, mesKey, tablasMensuales, kpis, liquidacionDueños } =
     useDashboard(inquilinos, pagos, entregas)
 
+  const [mostrarPagados, setMostrarPagados] = useState<Record<string, boolean>>({})
   const mesLabel = formatMes(today)
   const tablaActual = tablasMensuales.find(t => t.mesKey === mesKey)
   const pagadosCount = tablaActual ? tablaActual.inquilinos.filter(i => i.estadoPago === 'Pagado').length : 0
+
+  const tablasRenderizar = tablasMensuales.filter(t => t.mesKey === mesKey || mesesFijados.includes(t.mesKey))
+
 
   // ── KPI Card data ──────────────────────────────────────────────────────────
 
@@ -184,59 +130,54 @@ export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, 
             </p>
           </div>
         </div>
-      ) : (
-        tablasMensuales.map(tabla => {
-          // Si no es el mes actual y no hay inquilinos pendientes en el pasado, no mostrar la tabla
-          if (tabla.mesKey !== mesKey && tabla.inquilinos.length === 0) {
-            return null
-          }
-
-          const esMesActual = tabla.mesKey === mesKey
-
-          return (
-            <div key={tabla.mesKey} className="activity-card" style={{ marginBottom: '2rem' }}>
-              <div className="activity-header">
-                <div>
-                  <h3 className="chart-title">📋 Próximos Pagos — {tabla.mesLabel}</h3>
-                  <p className="chart-sub">
-                    {esMesActual
-                      ? "Mes actual. Ordenado por prioridad: Atrasados → Gracia → Pendientes → Pagados"
-                      : "Pagos pendientes de meses anteriores"}
-                  </p>
+      ) : tablasRenderizar.length > 0 ? (
+        tablasRenderizar.map(tabla => (
+          <div key={tabla.mesKey} className="activity-card" style={{ marginBottom: '2rem' }}>
+            <div className="activity-header">
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <h3 className="chart-title">
+                    {tabla.mesKey === mesKey ? '📋 Próximos Pagos' : '📌 Mes Fijado'} — {tabla.mesLabel}
+                  </h3>
                 </div>
-                <div className="dash-legend">
-                  <span className="status-badge estado-atrasado"><span className="status-dot" />Atrasado</span>
-                  <span className="status-badge estado-gracia"><span className="status-dot" />En Gracia</span>
-                  <span className="status-badge estado-pendiente"><span className="status-dot" />Pendiente</span>
-                  <span className="status-badge estado-pagado"><span className="status-dot" />Pagado</span>
-                </div>
+                <p className="chart-sub">
+                  {tabla.mesKey === mesKey 
+                    ? "Mes actual. Ordenado por prioridad: Atrasados → Gracia → Pendientes → Pagados" 
+                    : "Mostrado temporalmente desde Administración."}
+                </p>
               </div>
-
-              <table className="activity-table">
-                <thead>
-                  <tr>
-                    <th>Inquilino</th>
-                    <th>Monto</th>
-                    <th>Día de Pago</th>
-                    <th>Estado</th>
-                    <th>Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tabla.inquilinos.map(inq => (
-                    <FilaPago
-                      key={inq.id}
-                      inq={inq}
-                      mesKey={tabla.mesKey}
-                      onPago={registrarPago}
-                    />
-                  ))}
-                </tbody>
-              </table>
+              <div className="dash-legend">
+                <span className="status-badge estado-atrasado"><span className="status-dot" />Atrasado</span>
+                <span className="status-badge estado-gracia"><span className="status-dot" />En Gracia</span>
+                <span className="status-badge estado-pendiente"><span className="status-dot" />Pendiente</span>
+                <span className="status-badge estado-pagado"><span className="status-dot" />Pagado</span>
+              </div>
             </div>
-          )
-        })
-      )}
+
+            <table className="activity-table">
+              <thead>
+                <tr>
+                  <th>Inquilino</th>
+                  <th>Monto</th>
+                  <th>Día de Pago</th>
+                  <th>Estado</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tabla.inquilinos.map(inq => (
+                  <FilaPago
+                    key={inq.id}
+                    inq={inq}
+                    mesKey={tabla.mesKey}
+                    onPago={registrarPago}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))
+      ) : null}
 
       {/* ── Liquidación a Dueños ── */}
       {liquidacionDueños.length > 0 && (
@@ -308,30 +249,50 @@ export default function Dashboard({ inquilinos, pagos, entregas, registrarPago, 
                   </thead>
                   <tbody>
                     {liq.meses.map((mes) => (
-                      <tr key={mes.yearMonth} className={mes.listo ? 'liq-row-listo' : 'liq-row-pendiente'}>
+                      <tr key={mes.yearMonth} className={mes.entregado ? 'row-pagado' : (mes.listo ? 'liq-row-listo' : 'liq-row-pendiente')} style={mes.entregado ? { opacity: 0.7 } : {}}>
                         <td className="liq-mes-label">{formatYearMonth(mes.yearMonth)}</td>
                         <td className="liq-props">{mes.propiedades.join(' · ')}</td>
                         <td className="plan-cell">{formatMonto(mes.montoBruto)}</td>
                         <td className="plan-cell liq-comision">− {formatMonto(mes.comisionTotal)}</td>
                         <td className="plan-cell liq-neto">{formatMonto(mes.montoNeto)}</td>
                         <td>
-                          {mes.listo ? (
+                          {mes.entregado ? (
+                            <span className="status-badge estado-pagado">
+                              <span className="status-dot" />
+                              Entregado
+                            </span>
+                          ) : mes.listo ? (
                             <span className="status-badge status-success">
                               <span className="status-dot" />
                               Pagar ahora
                             </span>
                           ) : (
-                            <span className="status-badge estado-pendiente">
-                              <span className="status-dot" />
-                              El {mes.fechaEntrega.toLocaleDateString('es-DO', { day: 'numeric', month: 'short' })}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span className="status-badge estado-pendiente" style={{ width: 'fit-content' }}>
+                                <span className="status-dot" />
+                                El {mes.fechaEntrega.toLocaleDateString('es-DO', { day: 'numeric', month: 'short' })}
+                              </span>
+                              {mes.propiedadesFaltantes.length > 0 && (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--coral)' }}>
+                                  ⚠️ Faltan: {mes.propiedadesFaltantes.join(', ')}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="liq-accion-cell">
-                          {mes.listo && (
+                          {mes.entregado ? (
+                            <button
+                              className="btn-desmarcar"
+                              title="Deshacer pago al dueño"
+                              onClick={() => marcarEntrega(liq.dueño, mes.yearMonth, false)}
+                            >
+                              Deshacer
+                            </button>
+                          ) : mes.listo && (
                             <button
                               className="btn-entregado"
-                              title="Marcar como pagado al dueño (desaparece de la tabla)"
+                              title="Marcar como pagado al dueño"
                               onClick={() => marcarEntrega(liq.dueño, mes.yearMonth, true)}
                             >
                               ✓ Ya pagué al dueño

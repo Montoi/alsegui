@@ -1,11 +1,18 @@
 import { useState, useMemo } from 'react'
-import type { Inquilino } from '../types'
+import type { Inquilino, Pagos, Entregas } from '../types'
+import { useDashboard } from '../hooks/useDashboard'
+import { FilaPago } from '../components/FilaPago'
 import { getInitials, getAvatarColor, formatMonto, formatFecha } from '../utils/format'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface AdministracionProps {
   inquilinos: Inquilino[]
+  pagos: Pagos
+  entregas: Entregas
+  registrarPago: (inquilinoId: string, yearMonth: string, pagado: boolean) => void
+  mesesFijados: string[]
+  toggleMesFijado: (mes: string) => void
   onAgregar: (data: Omit<Inquilino, 'id'>) => void
   onEditar: (id: string, data: Partial<Omit<Inquilino, 'id'>>) => void
   onEliminar: (id: string) => void
@@ -234,6 +241,11 @@ function FormularioInquilino({ inicial, modo, onSubmit, onCancelar }: Formulario
 
 export default function Administracion({
   inquilinos,
+  pagos,
+  entregas,
+  registrarPago,
+  mesesFijados,
+  toggleMesFijado,
   onAgregar,
   onEditar,
   onEliminar,
@@ -241,6 +253,12 @@ export default function Administracion({
   const [modalAbierto, setModalAbierto] = useState(false)
   const [inquilinoEditando, setInquilinoEditando] = useState<Inquilino | null>(null)
   const [confirmarEliminar, setConfirmarEliminar] = useState<string | null>(null)
+  
+  const { tablasMensuales } = useDashboard(inquilinos, pagos, entregas)
+  const [mesSeleccionado, setMesSeleccionado] = useState<string>('')
+  
+  const currentMesSeleccionado = mesSeleccionado || (tablasMensuales.length > 0 ? tablasMensuales[tablasMensuales.length - 1].mesKey : '')
+  const tablaSeleccionada = tablasMensuales.find(t => t.mesKey === currentMesSeleccionado)
 
   function abrirAgregar() {
     setInquilinoEditando(null)
@@ -443,6 +461,62 @@ export default function Administracion({
           ))}
         </div>
       )}
+
+      {/* ── Historial de Pagos ── */}
+      <div className="activity-card" style={{ marginTop: '2rem' }}>
+        <div className="activity-header">
+          <div>
+            <h3 className="chart-title">🕰️ Historial de Pagos</h3>
+            <p className="chart-sub">Consulta y modifica pagos de meses anteriores.</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <select 
+              value={currentMesSeleccionado}
+              onChange={e => setMesSeleccionado(e.target.value)}
+              className="admin-month-select"
+              style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-lighter)', color: 'var(--text)' }}
+            >
+              {tablasMensuales.slice().reverse().map(t => (
+                <option key={t.mesKey} value={t.mesKey}>{t.mesLabel}</option>
+              ))}
+            </select>
+            
+            {currentMesSeleccionado && currentMesSeleccionado !== tablasMensuales[tablasMensuales.length - 1]?.mesKey && (
+              <button
+                className={mesesFijados.includes(currentMesSeleccionado) ? 'btn-desmarcar' : 'btn-entregado'}
+                onClick={() => toggleMesFijado(currentMesSeleccionado)}
+                style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+              >
+                {mesesFijados.includes(currentMesSeleccionado) ? 'Ocultar del Dashboard' : '📌 Mostrar en Dashboard'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {tablaSeleccionada && (
+          <table className="activity-table" style={{ marginTop: '1rem' }}>
+            <thead>
+              <tr>
+                <th>Inquilino</th>
+                <th>Monto</th>
+                <th>Día de Pago</th>
+                <th>Estado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tablaSeleccionada.inquilinos.map(inq => (
+                <FilaPago
+                  key={inq.id}
+                  inq={inq}
+                  mesKey={tablaSeleccionada.mesKey}
+                  onPago={registrarPago}
+                />
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {/* ── Modal Formulario ── */}
       {modalAbierto && (

@@ -63,8 +63,12 @@ export interface PagoPorMes {
   montoNeto: number
   /** Fecha exacta en que debes transferir al dueño (día de entrega de ese mes) */
   fechaEntrega: Date
-  /** true si hoy >= fechaEntrega */
+  /** true si hoy >= fechaEntrega y NO hay propiedades faltantes */
   listo: boolean
+  /** Propiedades que aún no han pagado en este mes */
+  propiedadesFaltantes: string[]
+  /** true si ya se marcó como pagado al dueño */
+  entregado: boolean
 }
 
 export interface LiquidacionDueño {

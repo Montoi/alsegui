@@ -71,9 +71,13 @@ router.put('/', async (req: Request, res: Response) => {
         [inquilinoId, yearMonth]
       )
     } else {
-      // Desmarcar: eliminar el registro (equivale a "no pagado")
+      // Desmarcar: actualizar a pagado=false en lugar de eliminar, 
+      // para no perder el registro del mes en el sistema.
       await pool.query(
-        'DELETE FROM pagos WHERE inquilino_id = $1 AND year_month = $2',
+        `INSERT INTO pagos (inquilino_id, year_month, pagado)
+         VALUES ($1, $2, FALSE)
+         ON CONFLICT (inquilino_id, year_month)
+         DO UPDATE SET pagado = FALSE, fecha_pago = NOW()`,
         [inquilinoId, yearMonth]
       )
     }

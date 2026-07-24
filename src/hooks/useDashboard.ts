@@ -100,7 +100,16 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
   // Se usa como punto de partida para inquilinos sin registros propios.
   const primerMesGlobal = useMemo(() => {
     const meses = Object.keys(pagos).sort()
-    return meses.length > 0 ? meses[0] : null
+    
+    // Por defecto mostrar desde Enero del año actual para que nunca desaparezcan 
+    // los meses si se desmarcan todos los pagos de la base de datos.
+    const currentYear = new Date().getFullYear()
+    const defaultStart = `${currentYear}-01`
+
+    if (meses.length > 0 && meses[0] < defaultStart) {
+      return meses[0]
+    }
+    return defaultStart
   }, [pagos])
 
   // ── 1. Tablas mensuales (Historial de impagos + Mes actual) ────────────────
@@ -138,15 +147,10 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
         return a.diasDiferencia - b.diasDiferencia
       })
 
-      const esMesActual = mKey === mesKey
-      const inqsFiltrados = esMesActual
-        ? inqsOrdenados
-        : inqsOrdenados.filter(i => !i.haPagado)
-
       return {
         mesKey: mKey,
         mesLabel: formatYearMonth(mKey),
-        inquilinos: inqsFiltrados,
+        inquilinos: inqsOrdenados,
       }
     })
   }, [inquilinos, pagos, primerMesGlobal, mesKey, today])
@@ -211,6 +215,14 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
       esperadoPorDueño[keyDueño] = (esperadoPorDueño[keyDueño] ?? 0) + neto
     }
 
+    // First, find all owners and their properties
+    const propsPorDueño: Record<string, Inquilino[]> = {}
+    for (const inq of inquilinos) {
+      const keyDueño = inq.nombreDueño ?? inq.propiedadAsignada
+      if (!propsPorDueño[keyDueño]) propsPorDueño[keyDueño] = []
+      propsPorDueño[keyDueño].push(inq)
+    }
+
     // grupos[dueño][yearMonth] = PagoPorMes
     const grupos: Record<string, {
       diaEntregaDueño: number
@@ -221,64 +233,77 @@ export function useDashboard(inquilinos: Inquilino[], pagos: Pagos, entregas: En
     for (const yearMonth of Object.keys(pagos)) {
       const pagosMes = pagos[yearMonth]
 
-      for (const [inquilinoId, pagado] of Object.entries(pagosMes)) {
-        if (!pagado) continue // solo pagos marcados como true
+      // Determinar qué dueños tienen AL MENOS UN PAGO este mes
+      const dueñosConPagos = new Set<string>()
+      for (const [inqId, pagado] of Object.entries(pagosMes)) {
+        if (pagado && inqMap[inqId]) {
+          const keyDueño = inqMap[inqId].nombreDueño ?? inqMap[inqId].propiedadAsignada
+          dueñosConPagos.add(keyDueño)
+        }
+      }
 
-        const inq = inqMap[inquilinoId]
-        if (!inq) continue
-
-        const keyDueño = inq.nombreDueño ?? inq.propiedadAsignada
-
-        // Inicializar grupo del dueño si no existe
+      // Evaluar todas las propiedades de cada dueño que tuvo al menos un cobro
+      for (const keyDueño of dueñosConPagos) {
         if (!grupos[keyDueño]) {
           grupos[keyDueño] = {
-            diaEntregaDueño: inq.diaEntregaDueño,
+            diaEntregaDueño: propsPorDueño[keyDueño][0].diaEntregaDueño,
             meses: {},
           }
         }
 
-        // "Listo" = la fecha de entrega DE ESE MES ya pasó (o es hoy)
         const [yStr, mStr] = yearMonth.split('-')
         const mesAno = parseInt(yStr, 10)
         const mesNum = parseInt(mStr, 10) - 1 // 0-indexed
-        const fechaEntrega = new Date(mesAno, mesNum, inq.diaEntregaDueño)
-        const listo = hoy >= fechaEntrega
+        const fechaEntrega = new Date(mesAno, mesNum, grupos[keyDueño].diaEntregaDueño)
 
-        // Inicializar entrada de ese mes si no existe
-        if (!grupos[keyDueño].meses[yearMonth]) {
-          grupos[keyDueño].meses[yearMonth] = {
-            yearMonth,
-            propiedades: [],
-            montoBruto:    0,
-            comisionTotal: 0,
-            montoNeto:     0,
-            fechaEntrega,
-            listo,
+        const monthEntry: PagoPorMes = {
+          yearMonth,
+          propiedades: [],
+          montoBruto: 0,
+          comisionTotal: 0,
+          montoNeto: 0,
+          fechaEntrega,
+          listo: false, // Se evalúa al final
+          propiedadesFaltantes: [],
+          entregado: false, // Se asigna al convertir
+        }
+
+        for (const inq of propsPorDueño[keyDueño]) {
+          const haPagado = !!pagosMes[inq.id]
+          if (haPagado) {
+            const comision = inq.montoAlquiler * (inq.comisionPorcentaje / 100)
+            monthEntry.propiedades.push(inq.propiedadAsignada)
+            monthEntry.montoBruto += inq.montoAlquiler
+            monthEntry.comisionTotal += comision
+            monthEntry.montoNeto += (inq.montoAlquiler - comision)
+          } else {
+            monthEntry.propiedadesFaltantes.push(inq.propiedadAsignada)
           }
         }
 
-        const comision = inq.montoAlquiler * (inq.comisionPorcentaje / 100)
-        const entrada  = grupos[keyDueño].meses[yearMonth]
-        entrada.propiedades.push(inq.propiedadAsignada)
-        entrada.montoBruto    += inq.montoAlquiler
-        entrada.comisionTotal += comision
-        entrada.montoNeto     += inq.montoAlquiler - comision
+        // Listo = la fecha de entrega DE ESE MES ya pasó (o es hoy) Y no faltan propiedades
+        monthEntry.listo = (hoy >= fechaEntrega) && (monthEntry.propiedadesFaltantes.length === 0)
+        
+        grupos[keyDueño].meses[yearMonth] = monthEntry
       }
     }
 
-    // Convertir a array, filtrar meses ya entregados y calcular totales
+    // Convertir a array, asignar estado de entregado y calcular totales
     return Object.entries(grupos)
       .map(([dueño, { diaEntregaDueño, meses }]) => {
-        // Excluir meses que ya fueron marcados como entregados al dueño
         const entregadosMes = new Set(entregas[dueño] ?? [])
+        
         const mesesOrdenados = Object.values(meses)
-          .filter(m => !entregadosMes.has(m.yearMonth))
+          .map(m => {
+            m.entregado = entregadosMes.has(m.yearMonth)
+            return m
+          })
           .sort((a, b) => a.yearMonth.localeCompare(b.yearMonth))
 
         if (mesesOrdenados.length === 0) return null // ocultar si no quedan meses
 
-        const totalListo     = mesesOrdenados.filter(m => m.listo).reduce((s, m) => s + m.montoNeto, 0)
-        const totalPendiente = mesesOrdenados.filter(m => !m.listo).reduce((s, m) => s + m.montoNeto, 0)
+        const totalListo     = mesesOrdenados.filter(m => m.listo && !m.entregado).reduce((s, m) => s + m.montoNeto, 0)
+        const totalPendiente = mesesOrdenados.filter(m => !m.listo && !m.entregado).reduce((s, m) => s + m.montoNeto, 0)
         return {
           dueño,
           diaEntregaDueño,
